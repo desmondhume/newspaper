@@ -2,6 +2,8 @@
 
 Read webpages in readability mode, inside your terminal.
 
+[![asciicast](https://asciinema.org/a/5yK2tOZGQ2AorIsZKRMv2ghc2.png)](https://asciinema.org/a/5yK2tOZGQ2AorIsZKRMv2ghc2)
+
 ### Why?
 Newsbeuter is a great command line tool to read your favourite RSS feeds.
 Also, it lets you choose which command to invoke when opening an article URL link, by setting the `browser` key inside configurations.
