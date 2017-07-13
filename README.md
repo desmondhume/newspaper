@@ -34,7 +34,7 @@ browser newspaper [OPTIONS] %u
 ### Options
 
 ```
--no-links     Replace markdown links
+-no-links    Remove markdown links
 -plaintext   Disable ANSI codes (plaintext output)
 ```
 
