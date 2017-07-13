@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	. "github.com/logrusorgru/aurora"
 	"github.com/lunny/html2md"
@@ -20,11 +21,15 @@ type FeedItem struct {
 }
 
 func main() {
+	nolinks := flag.Bool("no-links", false, "Remove links")
+	plaintext := flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+
+	flag.Parse()
 	item := FeedItem{}
 
 	// Create client to fetch article from given url
 	client := &http.Client{}
-	url := fmt.Sprintf("https://mercury.postlight.com/parser?url=%s", os.Args[1])
+	url := fmt.Sprintf("https://mercury.postlight.com/parser?url=%s", os.Args[len(os.Args)-1])
 	request, _ := http.NewRequest("GET", url, nil)
 
 	// Append mercury postlight api key to request headers
@@ -41,23 +46,38 @@ func main() {
 
 	// Convert html to readable markdown
 	md := html2md.Convert(item.Content)
-	unescapedMd := html.UnescapeString(md)
+	output := html.UnescapeString(md)
+
+	var regex *regexp.Regexp
 
 	// Squash multiple lines blocks into single blank lines
-	regex, _ := regexp.Compile(`(\s*\n){2,}`)
-	output := regex.ReplaceAllString(unescapedMd, "\n\n")
-
-	// Convert markdown wrappers to ANSI codes (to enhance subtitles)
-	regex, _ = regexp.Compile(`\*\*(.*)\*\*`)
-	output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
-
-	// Convert markdown wrappers to ANSI codes (to enhance subtitles)
-	regex, _ = regexp.Compile("## (.*)")
-	output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+	regex, _ = regexp.Compile(`(\s*\n){2,}`)
+	output = regex.ReplaceAllString(output, "\n\n")
 
 	// Remove leading whitespaces
 	regex, _ = regexp.Compile(`[\n\n ][ \t]+`)
 	output = regex.ReplaceAllString(output, "")
+
+	// Remove links if -nolinks is passed
+	if *nolinks {
+		// Remove empty links (like js-driven anchors)
+		regex, _ = regexp.Compile(`\[\]\(\)`)
+		output = regex.ReplaceAllString(output, "")
+
+		// Remove other links
+		regex, _ = regexp.Compile(`\[(.*)\]\((.*)\)`)
+		output = regex.ReplaceAllString(output, "$1")
+	}
+
+	if !*plaintext {
+		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
+		regex, _ = regexp.Compile(`\*\*(.*)\*\*`)
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+
+		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
+		regex, _ = regexp.Compile("## (.*)")
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+	}
 
 	// Wrap text to 80 columns to make the content more readable
 	output = wordwrap.WrapString(output, 80)
