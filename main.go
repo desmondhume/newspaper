@@ -9,6 +9,7 @@ import (
 	"github.com/mitchellh/go-wordwrap"
 	"html"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
@@ -21,27 +22,50 @@ type FeedItem struct {
 }
 
 func main() {
-	nolinks := flag.Bool("no-links", false, "Remove links")
-	plaintext := flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+	var (
+		nolinks   = flag.Bool("no-links", false, "Remove links")
+		plaintext = flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+	)
 
 	flag.Parse()
 	item := FeedItem{}
 
 	// Create client to fetch article from given url
 	client := &http.Client{}
-	url := fmt.Sprintf("https://mercury.postlight.com/parser?url=%s", os.Args[len(os.Args)-1])
+	url := fmt.Sprintf("https://mercury.postlight.com/parser?url=%s", url.QueryEscape(os.Args[len(os.Args)-1]))
 	request, _ := http.NewRequest("GET", url, nil)
 
 	// Append mercury postlight api key to request headers
 	apikey := os.Getenv("MERCURY_API_KEY")
+	if apikey == "" {
+		fmt.Printf("API key not found. Set MERCURY_API_KEY in your terminal.")
+		os.Exit(1)
+	}
 	request.Header.Set("x-api-key", apikey)
-	response, _ := client.Do(request)
+	response, err := client.Do(request)
+	if err != nil {
+		fmt.Printf("Unable to request data from URL %s: %v", url, err)
+	}
 	defer response.Body.Close()
 
+	// Check for messages from server
+	if response.StatusCode != 200 {
+		errMsg := struct {
+			Message string `json:"message"`
+		}{}
+		err := json.NewDecoder(response.Body).Decode(&errMsg)
+		if err != nil {
+			fmt.Printf("Unable to decode error message from server: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Error: Received message from server: %s\n", errMsg.Message)
+		os.Exit(1)
+	}
+
 	// Fill the `item` attributes with api response
-	err := json.NewDecoder(response.Body).Decode(&item)
-	if err != nil {
-		panic(err)
+	if err := json.NewDecoder(response.Body).Decode(&item); err != nil {
+		fmt.Printf("Unable to decode json from Mercury: %v\n", err)
+		os.Exit(1)
 	}
 
 	// Convert html to readable markdown
@@ -51,31 +75,31 @@ func main() {
 	var regex *regexp.Regexp
 
 	// Squash multiple lines blocks into single blank lines
-	regex, _ = regexp.Compile(`(\s*\n){2,}`)
+	regex = regexp.MustCompile(`(\s*\n){2,}`)
 	output = regex.ReplaceAllString(output, "\n\n")
 
 	// Remove leading whitespaces
-	regex, _ = regexp.Compile(`[\n\n ][ \t]+`)
+	regex = regexp.MustCompile(`[\n\n ][ \t]+`)
 	output = regex.ReplaceAllString(output, "")
 
 	// Remove links if -nolinks is passed
 	if *nolinks {
 		// Remove empty links (like js-driven anchors)
-		regex, _ = regexp.Compile(`\[\]\(\)`)
+		regex = regexp.MustCompile(`\[\]\(\)`)
 		output = regex.ReplaceAllString(output, "")
 
 		// Remove other links
-		regex, _ = regexp.Compile(`\[(.*)\]\((.*)\)`)
+		regex = regexp.MustCompile(`\[(.*)\]\((.*)\)`)
 		output = regex.ReplaceAllString(output, "$1")
 	}
 
 	if !*plaintext {
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
-		regex, _ = regexp.Compile(`\*\*(.*)\*\*`)
+		regex = regexp.MustCompile(`\*\*(.*)\*\*`)
 		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
 
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
-		regex, _ = regexp.Compile("## (.*)")
+		regex = regexp.MustCompile("## (.*)")
 		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
 	}
 
