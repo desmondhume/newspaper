@@ -117,6 +117,10 @@ func main() {
 	cmd.Stdout = os.Stdout
 
 	// Start the command and wait for user actions
-	cmd.Start()
-	cmd.Wait()
+	err = cmd.Start()
+	if err != nil {
+		fmt.Print(err)
+	} else {
+		cmd.Wait()
+	}
 }
