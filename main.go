@@ -108,7 +108,6 @@ func main() {
 
 	// Format article output with title and content
 	output = fmt.Sprintf("%s\n%s", Bold(Red(item.Title)), output)
-	// cmd := exec.Command("/usr/bin/less", "-s")
 	cmd := exec.Command(PATH_TO_TERMINAL_PAGER_PROGRAM)
 
 	// Set `less` stdin to string Reader
