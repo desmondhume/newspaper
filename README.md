@@ -13,7 +13,7 @@ You can choose to plug `newspaper` inside newsbeuter, or use it directly from th
 
 The heavy lifting is made by [Mercury](https://mercury.postlight.com/web-parser/), an amazing and **free** service that converts URL to markdown.
 
-This package starts as a light and pluggable command between their api and the `less` command.
+This package starts as a light and pluggable command between their api and the `less` command for Unix and `more` command for Windows.
 
 ### Usage
 
