@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"io/ioutil"
 )
 
 type FeedItem struct {
@@ -25,6 +26,7 @@ func main() {
 	var (
 		nolinks   = flag.Bool("no-links", false, "Remove links")
 		plaintext = flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+		saveToFile = flag.Bool("save-to-file", false, "Save output to file")
 	)
 
 	flag.Parse()
@@ -108,15 +110,26 @@ func main() {
 
 	// Format article output with title and content
 	output = fmt.Sprintf("%s\n%s", Bold(Red(item.Title)), output)
-	cmd := exec.Command("/usr/bin/less", "-s")
 
-	// Set `less` stdin to string Reader
-	cmd.Stdin = strings.NewReader(output)
+	if *saveToFile {
+		outputAsBytes := []byte(output)
+		filename := fmt.Sprintf("%s.md", item.Title)
+		err = ioutil.WriteFile(filename, outputAsBytes, 0644)
+		if err != nil {
+			fmt.Printf("Unable to save output to the file: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		cmd := exec.Command("/usr/bin/less", "-s")
 
-	// Set `less` stdout to os stdout
-	cmd.Stdout = os.Stdout
-
-	// Start the command and wait for user actions
-	cmd.Start()
-	cmd.Wait()
+		// Set `less` stdin to string Reader
+		cmd.Stdin = strings.NewReader(output)
+	
+		// Set `less` stdout to os stdout
+		cmd.Stdout = os.Stdout
+	
+		// Start the command and wait for user actions
+		cmd.Start()
+		cmd.Wait()
+	}
 }
