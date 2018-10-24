@@ -1,25 +1,20 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	. "github.com/logrusorgru/aurora"
 	"github.com/lunny/html2md"
 	"github.com/mitchellh/go-wordwrap"
 	"html"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"github.com/go-shiori/go-readability"
+	"time"
 )
-
-type FeedItem struct {
-	Title   string
-	Content string
-}
 
 func main() {
 	var (
@@ -28,48 +23,18 @@ func main() {
 	)
 
 	flag.Parse()
-	item := FeedItem{}
 
-	// Create client to fetch article from given url
-	client := &http.Client{}
-	url := fmt.Sprintf("https://mercury.postlight.com/parser?url=%s", url.QueryEscape(os.Args[len(os.Args)-1]))
-	request, _ := http.NewRequest("GET", url, nil)
+	// Fetch article from given url
+	articleUrl := os.Args[len(os.Args)-1]
+	parsedURL, _ := url.Parse(articleUrl)
 
-	// Append mercury postlight api key to request headers
-	apikey := os.Getenv("MERCURY_API_KEY")
-	if apikey == "" {
-		fmt.Printf("API key not found. Set MERCURY_API_KEY in your terminal.")
-		os.Exit(1)
-	}
-	request.Header.Set("x-api-key", apikey)
-	response, err := client.Do(request)
+	article, err := readability.FromURL(parsedURL, 5*time.Second)
 	if err != nil {
-		fmt.Printf("Unable to request data from URL %s: %v", url, err)
-	}
-	defer response.Body.Close()
-
-	// Check for messages from server
-	if response.StatusCode != 200 {
-		errMsg := struct {
-			Message string `json:"message"`
-		}{}
-		err := json.NewDecoder(response.Body).Decode(&errMsg)
-		if err != nil {
-			fmt.Printf("Unable to decode error message from server: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("Error: Received message from server: %s\n", errMsg.Message)
-		os.Exit(1)
-	}
-
-	// Fill the `item` attributes with api response
-	if err := json.NewDecoder(response.Body).Decode(&item); err != nil {
-		fmt.Printf("Unable to decode json from Mercury: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Unable to request data from URL %s: %v", articleUrl, err)
 	}
 
 	// Convert html to readable markdown
-	md := html2md.Convert(item.Content)
+	md := html2md.Convert(article.RawContent)
 	output := html.UnescapeString(md)
 
 	var regex *regexp.Regexp
@@ -107,7 +72,7 @@ func main() {
 	output = wordwrap.WrapString(output, 80)
 
 	// Format article output with title and content
-	output = fmt.Sprintf("%s\n%s", Bold(Red(item.Title)), output)
+	output = fmt.Sprintf("%s\n%s", Bold(Red(article.Meta.Title)), output)
 	cmd := exec.Command("/usr/bin/less", "-s")
 
 	// Set `less` stdin to string Reader
