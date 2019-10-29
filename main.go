@@ -25,6 +25,20 @@ func main() {
 		saveToFile = flag.Bool("save-to-file", false, "Save output to file")
 	)
 
+	var bold = func(arg interface{}) aurora.Value {
+		if *plaintext || *saveToFile {
+			return aurora.Reset(arg)
+		}
+		return aurora.Bold(arg)
+	}
+
+	var red = func(arg interface{}) aurora.Value {
+		if *plaintext || *saveToFile {
+			return aurora.Reset(arg)
+		}
+		return aurora.Red(arg)
+	}
+
 	flag.Parse()
 
 	// Fetch article from given url
@@ -64,18 +78,18 @@ func main() {
 	if !*plaintext {
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile(`\*\*(.*)\*\*`)
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", bold("$1")))
 
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile("## (.*)")
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", bold("$1")))
 	}
 
 	// Wrap text to 80 columns to make the content more readable
 	output = wordwrap.WrapString(output, 80)
 
 	// Format article output with title and content
-	output = fmt.Sprintf("%s\n%s", aurora.Bold(aurora.Red(article.Title)), output)
+	output = fmt.Sprintf("%s\n%s", bold(red(article.Title)), output)
 
 	if *saveToFile {
 		outputAsBytes := []byte(output)
