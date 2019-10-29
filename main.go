@@ -3,17 +3,18 @@ package main
 import (
 	"flag"
 	"fmt"
-	. "github.com/logrusorgru/aurora"
-	"github.com/lunny/html2md"
-	"github.com/mitchellh/go-wordwrap"
 	"html"
 	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-	"github.com/go-shiori/go-readability"
 	"time"
+
+	"github.com/go-shiori/go-readability"
+	"github.com/logrusorgru/aurora"
+	"github.com/lunny/html2md"
+	"github.com/mitchellh/go-wordwrap"
 )
 
 func main() {
@@ -25,16 +26,16 @@ func main() {
 	flag.Parse()
 
 	// Fetch article from given url
-	articleUrl := os.Args[len(os.Args)-1]
-	parsedURL, _ := url.Parse(articleUrl)
+	articleURL := os.Args[len(os.Args)-1]
+	parsedURL, _ := url.Parse(articleURL)
 
-	article, err := readability.FromURL(parsedURL, 5*time.Second)
+	article, err := readability.FromURL(parsedURL.String(), 5*time.Second)
 	if err != nil {
-		fmt.Printf("Unable to request data from URL %s: %v", articleUrl, err)
+		fmt.Printf("Unable to request data from URL %s: %v", articleURL, err)
 	}
 
 	// Convert html to readable markdown
-	md := html2md.Convert(article.RawContent)
+	md := html2md.Convert(article.Content)
 	output := html.UnescapeString(md)
 
 	var regex *regexp.Regexp
@@ -61,18 +62,18 @@ func main() {
 	if !*plaintext {
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile(`\*\*(.*)\*\*`)
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
 
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile("## (.*)")
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
 	}
 
 	// Wrap text to 80 columns to make the content more readable
 	output = wordwrap.WrapString(output, 80)
 
 	// Format article output with title and content
-	output = fmt.Sprintf("%s\n%s", Bold(Red(article.Meta.Title)), output)
+	output = fmt.Sprintf("%s\n%s", aurora.Bold(aurora.Red(article.Title)), output)
 	cmd := exec.Command("/usr/bin/less", "-s")
 
 	// Set `less` stdin to string Reader
