@@ -74,7 +74,7 @@ func main() {
 
 	// Format article output with title and content
 	output = fmt.Sprintf("%s\n%s", aurora.Bold(aurora.Red(article.Title)), output)
-	cmd := exec.Command("/usr/bin/less", "-s")
+	cmd := exec.Command(PATH_TO_TERMINAL_PAGER_PROGRAM, PARAMS_FOR_TERMINAL_PAGER_PROGRAM)
 
 	// Set `less` stdin to string Reader
 	cmd.Stdin = strings.NewReader(output)
@@ -83,6 +83,10 @@ func main() {
 	cmd.Stdout = os.Stdout
 
 	// Start the command and wait for user actions
-	cmd.Start()
-	cmd.Wait()
+	err = cmd.Start()
+	if err != nil {
+		fmt.Print(err)
+	} else {
+		cmd.Wait()
+	}
 }
