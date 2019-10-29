@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"html"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
@@ -19,9 +20,24 @@ import (
 
 func main() {
 	var (
-		nolinks   = flag.Bool("no-links", false, "Remove links")
-		plaintext = flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+		nolinks    = flag.Bool("no-links", false, "Remove links")
+		plaintext  = flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+		saveToFile = flag.Bool("save-to-file", false, "Save output to file")
 	)
+
+	var bold = func(arg interface{}) aurora.Value {
+		if *plaintext || *saveToFile {
+			return aurora.Reset(arg)
+		}
+		return aurora.Bold(arg)
+	}
+
+	var red = func(arg interface{}) aurora.Value {
+		if *plaintext || *saveToFile {
+			return aurora.Reset(arg)
+		}
+		return aurora.Red(arg)
+	}
 
 	flag.Parse()
 
@@ -62,31 +78,42 @@ func main() {
 	if !*plaintext {
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile(`\*\*(.*)\*\*`)
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", bold("$1")))
 
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile("## (.*)")
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", bold("$1")))
 	}
 
 	// Wrap text to 80 columns to make the content more readable
 	output = wordwrap.WrapString(output, 80)
 
 	// Format article output with title and content
-	output = fmt.Sprintf("%s\n%s", aurora.Bold(aurora.Red(article.Title)), output)
-	cmd := exec.Command(PATH_TO_TERMINAL_PAGER_PROGRAM, PARAMS_FOR_TERMINAL_PAGER_PROGRAM)
+	output = fmt.Sprintf("%s\n%s", bold(red(article.Title)), output)
 
-	// Set `less` stdin to string Reader
-	cmd.Stdin = strings.NewReader(output)
-
-	// Set `less` stdout to os stdout
-	cmd.Stdout = os.Stdout
-
-	// Start the command and wait for user actions
-	err = cmd.Start()
-	if err != nil {
-		fmt.Print(err)
+	if *saveToFile {
+		outputAsBytes := []byte(output)
+		filename := fmt.Sprintf("%s.md", article.Title)
+		err = ioutil.WriteFile(filename, outputAsBytes, 0644)
+		if err != nil {
+			fmt.Printf("Unable to save output to the file: %v\n", err)
+			os.Exit(1)
+		}
 	} else {
-		cmd.Wait()
+		cmd := exec.Command(PathToTerminalPagerProgram, ParamsForTerminalPagerProgram)
+
+		// Set `less` stdin to string Reader
+		cmd.Stdin = strings.NewReader(output)
+
+		// Set `less` stdout to os stdout
+		cmd.Stdout = os.Stdout
+
+		// Start the command and wait for user actions
+		err = cmd.Start()
+		if err != nil {
+			fmt.Print(err)
+		} else {
+			cmd.Wait()
+		}
 	}
 }

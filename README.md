@@ -36,6 +36,7 @@ browser newspaper [OPTIONS] %u
 ```
 -no-links    Remove markdown links
 -plaintext   Disable ANSI codes (plaintext output)
+-save-to-file    Save output to markdown file
 ```
 
 ### Todo
