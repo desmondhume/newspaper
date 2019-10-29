@@ -1,77 +1,43 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	. "github.com/logrusorgru/aurora"
-	"github.com/lunny/html2md"
-	"github.com/mitchellh/go-wordwrap"
 	"html"
-	"net/http"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
-	"io/ioutil"
-)
+	"time"
 
-type FeedItem struct {
-	Title   string
-	Content string
-}
+	"github.com/go-shiori/go-readability"
+	"github.com/logrusorgru/aurora"
+	"github.com/lunny/html2md"
+	"github.com/mitchellh/go-wordwrap"
+)
 
 func main() {
 	var (
-		nolinks   = flag.Bool("no-links", false, "Remove links")
-		plaintext = flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
+		nolinks    = flag.Bool("no-links", false, "Remove links")
+		plaintext  = flag.Bool("plaintext", false, "Disable ANSI (plain-text output)")
 		saveToFile = flag.Bool("save-to-file", false, "Save output to file")
 	)
 
 	flag.Parse()
-	item := FeedItem{}
 
-	// Create client to fetch article from given url
-	client := &http.Client{}
-	url := fmt.Sprintf("https://mercury.postlight.com/parser?url=%s", url.QueryEscape(os.Args[len(os.Args)-1]))
-	request, _ := http.NewRequest("GET", url, nil)
+	// Fetch article from given url
+	articleURL := os.Args[len(os.Args)-1]
+	parsedURL, _ := url.Parse(articleURL)
 
-	// Append mercury postlight api key to request headers
-	apikey := os.Getenv("MERCURY_API_KEY")
-	if apikey == "" {
-		fmt.Printf("API key not found. Set MERCURY_API_KEY in your terminal.")
-		os.Exit(1)
-	}
-	request.Header.Set("x-api-key", apikey)
-	response, err := client.Do(request)
+	article, err := readability.FromURL(parsedURL.String(), 5*time.Second)
 	if err != nil {
-		fmt.Printf("Unable to request data from URL %s: %v", url, err)
-	}
-	defer response.Body.Close()
-
-	// Check for messages from server
-	if response.StatusCode != 200 {
-		errMsg := struct {
-			Message string `json:"message"`
-		}{}
-		err := json.NewDecoder(response.Body).Decode(&errMsg)
-		if err != nil {
-			fmt.Printf("Unable to decode error message from server: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("Error: Received message from server: %s\n", errMsg.Message)
-		os.Exit(1)
-	}
-
-	// Fill the `item` attributes with api response
-	if err := json.NewDecoder(response.Body).Decode(&item); err != nil {
-		fmt.Printf("Unable to decode json from Mercury: %v\n", err)
-		os.Exit(1)
+		fmt.Printf("Unable to request data from URL %s: %v", articleURL, err)
 	}
 
 	// Convert html to readable markdown
-	md := html2md.Convert(item.Content)
+	md := html2md.Convert(article.Content)
 	output := html.UnescapeString(md)
 
 	var regex *regexp.Regexp
@@ -98,38 +64,42 @@ func main() {
 	if !*plaintext {
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile(`\*\*(.*)\*\*`)
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
 
 		// Convert markdown wrappers to ANSI codes (to enhance subtitles)
 		regex = regexp.MustCompile("## (.*)")
-		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", Bold("$1")))
+		output = regex.ReplaceAllString(output, fmt.Sprintf("%s", aurora.Bold("$1")))
 	}
 
 	// Wrap text to 80 columns to make the content more readable
 	output = wordwrap.WrapString(output, 80)
 
 	// Format article output with title and content
-	output = fmt.Sprintf("%s\n%s", Bold(Red(item.Title)), output)
+	output = fmt.Sprintf("%s\n%s", aurora.Bold(aurora.Red(article.Title)), output)
 
 	if *saveToFile {
 		outputAsBytes := []byte(output)
-		filename := fmt.Sprintf("%s.md", item.Title)
+		filename := fmt.Sprintf("%s.md", article.Title)
 		err = ioutil.WriteFile(filename, outputAsBytes, 0644)
 		if err != nil {
 			fmt.Printf("Unable to save output to the file: %v\n", err)
 			os.Exit(1)
 		}
 	} else {
-		cmd := exec.Command("/usr/bin/less", "-s")
+		cmd := exec.Command(PathToTerminalPagerProgram, ParamsForTerminalPagerProgram)
 
 		// Set `less` stdin to string Reader
 		cmd.Stdin = strings.NewReader(output)
-	
+
 		// Set `less` stdout to os stdout
 		cmd.Stdout = os.Stdout
-	
+
 		// Start the command and wait for user actions
-		cmd.Start()
-		cmd.Wait()
+		err = cmd.Start()
+		if err != nil {
+			fmt.Print(err)
+		} else {
+			cmd.Wait()
+		}
 	}
 }
