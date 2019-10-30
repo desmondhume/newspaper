@@ -11,15 +11,13 @@ Also, it lets you choose which command to invoke when opening an article URL lin
 
 You can choose to plug `newspaper` inside newsbeuter, or use it directly from the command line.
 
-The heavy lifting is made by [Mercury](https://mercury.postlight.com/web-parser/), an amazing and **free** service that converts URL to markdown.
+The heavy lifting is made by [go-readability](https://github.com/go-shiori/go-readability), the library that converts URL to markdown.
 
 This package starts as a light and pluggable command between their api and the `less` command for Unix and `more` command for Windows.
 
 ### Usage
 
 - `go get github.com/desmondhume/newspaper`
-- Sign up for [Mercury](https://mercury.postlight.com/) and create an api key.
-- Store the api key inside an ENV variable called `MERCURY_API_KEY`
 - `newspaper URL`
 
 
@@ -42,6 +40,6 @@ browser newspaper [OPTIONS] %u
 ### Todo
 
 - [ ] Tests
-- [ ] Replace Mercury with a readability library
-- [ ] Save article to Markdown
+- [x] Replace Mercury with a readability library
+- [x] Save article to Markdown
 
